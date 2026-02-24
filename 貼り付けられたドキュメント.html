@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>リンクメモリー</title>
+
+<style>
+body{
+margin:0;
+font-family:-apple-system,BlinkMacSystemFont;
+background:linear-gradient(135deg,#c9d6ff,#e2e2e2);
+min-height:100vh;
+padding:20px;
+}
+
+h1{
+text-align:center;
+color:#fff;
+text-shadow:0 2px 10px rgba(0,0,0,0.3);
+}
+
+.glass{
+background:rgba(255,255,255,0.25);
+backdrop-filter:blur(12px);
+border-radius:20px;
+padding:15px;
+margin-bottom:15px;
+box-shadow:0 8px 30px rgba(0,0,0,0.2);
+}
+
+input,select,button,textarea{
+width:100%;
+margin:5px 0;
+padding:10px;
+border-radius:12px;
+border:none;
+font-size:14px;
+}
+
+button{
+background:#007aff;
+color:white;
+font-weight:bold;
+}
+
+.card{
+overflow:hidden;
+}
+
+.thumb{
+width:100%;
+aspect-ratio:4/3;
+object-fit:cover;
+border-radius:15px;
+}
+
+.progress{
+height:8px;
+background:#fff3;
+border-radius:10px;
+overflow:hidden;
+margin-top:5px;
+}
+
+.bar{
+height:100%;
+width:0%;
+background:#007aff;
+transition:width 0.3s;
+}
+
+.copybtn{
+background:#fff;
+color:#007aff;
+font-size:12px;
+padding:4px 8px;
+width:auto;
+margin-left:5px;
+}
+
+.count{
+font-weight:bold;
+color:#ff3b30;
+}
+
+</style>
+</head>
+<body>
+
+<h1>リンクメモリー</h1>
+
+<div class="glass">
+<input id="title" placeholder="タイトル">
+<input id="cat" placeholder="カテゴリー">
+<input id="date" type="date">
+<input id="url" placeholder="URL / 画像 / YouTube">
+<textarea id="memo" placeholder="メモ"></textarea>
+
+<button onclick="save()">保存</button>
+
+<div class="progress"><div class="bar" id="bar"></div></div>
+</div>
+
+<div class="glass">
+<input id="search" placeholder="検索" oninput="render()">
+<select id="catFilter" onchange="render()">
+<option value="">全カテゴリー</option>
+</select>
+
+<button onclick="backup()">バックアップ</button>
+<input type="file" onchange="restore(event)">
+</div>
+
+<div id="cards"></div>
+
+<script>
+let data=JSON.parse(localStorage.getItem('linkmem')||'[]')
+
+function yt(url){
+let id=url.match(/(?:v=|youtu\.be\/)([^&]+)/)
+return id?`https://img.youtube.com/vi/${id[1]}/hqdefault.jpg`:url
+}
+
+function save(){
+let bar=document.getElementById('bar')
+bar.style.width='0%'
+let i=0
+let anim=setInterval(()=>{
+i+=20
+bar.style.width=i+'%'
+if(i>=100){
+clearInterval(anim)
+
+data.push({
+title:title.value,
+cat:cat.value,
+date:date.value,
+url:url.value,
+memo:memo.value
+})
+
+localStorage.setItem('linkmem',JSON.stringify(data))
+title.value=cat.value=date.value=url.value=memo.value=''
+updateCats()
+render()
+}
+},80)
+}
+
+function copy(t){
+navigator.clipboard.writeText(t)
+}
+
+function years(d){
+if(!d)return''
+let start=new Date(d)
+let now=new Date()
+let y=now.getFullYear()-start.getFullYear()
+let next=new Date(start)
+next.setFullYear(start.getFullYear()+y+1)
+let diff=Math.ceil((next-now)/86400000)
+return `${y}年目 / 次まで${diff}日`
+}
+
+function render(){
+let q=search.value.toLowerCase()
+let f=catFilter.value
+cards.innerHTML=''
+data.forEach((c,i)=>{
+if(q && !c.title.toLowerCase().includes(q) && !c.memo.toLowerCase().includes(q))return
+if(f && c.cat!==f)return
+
+let img=c.url?yt(c.url):''
+let d=document.createElement('div')
+d.className='glass card'
+d.innerHTML=`
+${img?`<img class="thumb" src="${img}">`:''}
+<h3>${c.title}</h3>
+<div>${c.cat}</div>
+<div class="count">${years(c.date)}</div>
+
+${c.url?`<div>
+<a href="${c.url}" target="_blank">開く</a>
+<button class="copybtn" onclick="copy('${c.url}')">コピー</button>
+</div>`:''}
+
+${c.memo?`<div>
+${c.memo}
+<button class="copybtn" onclick="copy('${c.memo}')">コピー</button>
+</div>`:''}
+
+<button onclick="del(${i})">削除</button>
+`
+cards.appendChild(d)
+})
+}
+
+function del(i){
+data.splice(i,1)
+localStorage.setItem('linkmem',JSON.stringify(data))
+render()
+}
+
+function backup(){
+let blob=new Blob([JSON.stringify(data)],{type:'application/json'})
+let a=document.createElement('a')
+a.href=URL.createObjectURL(blob)
+a.download='linkmemory.json'
+a.click()
+}
+
+function restore(e){
+let r=new FileReader()
+r.onload=()=>{
+data=JSON.parse(r.result)
+localStorage.setItem('linkmem',JSON.stringify(data))
+updateCats()
+render()
+}
+r.readAsText(e.target.files[0])
+}
+
+function updateCats(){
+let set=[...new Set(data.map(d=>d.cat))]
+catFilter.innerHTML='<option value="">全カテゴリー</option>'
+set.forEach(c=>{
+let o=document.createElement('option')
+o.textContent=c
+catFilter.appendChild(o)
+})
+}
+
+updateCats()
+render()
+</script>
+
+</body>
+</html>
